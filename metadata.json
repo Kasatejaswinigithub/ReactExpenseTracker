@@ -1,0 +1,5 @@
+{
+  "name": "Comfortaa Expense Tracker",
+  "description": "A stylish, responsive expense tracker with a unique circular design theme and local persistence layer mimicking MongoDB behavior.",
+  "requestFramePermissions": []
+}
