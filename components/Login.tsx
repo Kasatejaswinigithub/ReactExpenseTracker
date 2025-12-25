@@ -1,5 +1,5 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AuthService } from '../services/authService';
 import { User } from '../types';
 
@@ -13,12 +13,11 @@ const Login: React.FC<LoginProps> = ({ setUser }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const navigate = useNavigate();
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError('Please fill in all fields');
+      setError('Both fields are required');
       return;
     }
 
@@ -35,97 +34,99 @@ const Login: React.FC<LoginProps> = ({ setUser }) => {
       
       AuthService.saveSession(user);
       setUser(user);
-      navigate('/tracker');
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSubmit();
-  };
-
   return (
-    <div className="relative h-screen w-full overflow-hidden border-[11px] border-black flex items-center bg-white">
-      {/* Decorative Circle */}
+    <div className="relative h-screen w-full overflow-hidden border-[12px] border-secondary flex items-center bg-white">
+      {/* Dynamic Background Element */}
       <div 
-        className="
-          absolute rounded-full z-10
-          w-[300px] h-[300px] -right-[120px] -top-[165px] bg-black
-          md:w-[750px] md:h-[750px] md:-right-[385px] md:-top-[20px] md:bg-primary
-          transition-all duration-500 ease-in-out
-        "
+        className={`
+          absolute rounded-full z-10 transition-all duration-700 ease-in-out
+          w-[350px] h-[350px] -right-[150px] -top-[150px] bg-secondary
+          md:w-[850px] md:h-[850px] md:-right-[350px] md:-top-[100px] md:bg-primary
+        `}
       ></div>
 
-      {/* Header */}
-      <div className="absolute top-0 left-0 w-full z-20 flex justify-between items-center p-6 md:mb-[45%] mt-5 md:mt-0">
-        <h4 className="m-0 text-xl font-bold flex items-center gap-2 text-black md:text-black">
-          Expense Tracker <i className="fa-solid fa-sack-dollar"></i>
-        </h4>
+      <div className="absolute top-0 left-0 w-full z-20 flex justify-between items-center p-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-secondary md:bg-white text-white md:text-primary rounded-xl flex items-center justify-center shadow-lg">
+            <i className="fa-solid fa-sack-dollar text-xl"></i>
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-secondary">SmartExpense</h1>
+        </div>
         <button 
           onClick={() => {
             setIsRegistering(!isRegistering);
             setError('');
           }}
-          className="btn bg-white text-black md:text-primary font-bold shadow-[4px_4px_2px_rgba(0,0,0,0.5)] px-4 py-2 rounded transition-transform active:scale-95 border border-gray-200 z-30"
+          className="bg-white text-secondary font-bold shadow-[4px_4px_0px_#111827] px-6 py-2 rounded-lg border-2 border-secondary hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#111827] transition-all active:scale-95 z-30"
         >
-          {isRegistering ? 'Login Instead' : 'Register Now'}
+          {isRegistering ? 'Login' : 'Join'}
         </button>
       </div>
 
-      {/* Main Content */}
-      <div className="z-20 ml-11 md:ml-[45px] max-w-lg w-full px-4 mt-20 md:mt-0">
-        <h3 className="text-2xl md:text-3xl font-light mb-4 text-black">
-          {isRegistering ? 'Create Account' : 'Welcome Back'}
-          <br />
-          <span 
-            className="text-4xl md:text-6xl font-bold text-black md:text-primary block leading-tight transition-colors duration-300 mt-2"
-            style={{ wordBreak: 'break-word' }}
-          >
-            {username || (isRegistering ? 'Join Us' : 'Login')}
-          </span>
-        </h3>
-
-        {error && (
-          <div className="mb-4 text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4 mb-6">
-          <div className="form-floating shadow-[4px_4px_4px_rgba(0,0,0,0.25)] rounded-lg bg-white overflow-hidden border border-gray-200">
-            <input
-              type="text"
-              className="form-control w-full p-4 text-lg outline-none"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyUp={handleKeyPress}
-            />
-          </div>
-
-          <div className="form-floating shadow-[4px_4px_4px_rgba(0,0,0,0.25)] rounded-lg bg-white overflow-hidden border border-gray-200">
-            <input
-              type="password"
-              className="form-control w-full p-4 text-lg outline-none"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyUp={handleKeyPress}
-            />
-          </div>
+      <div className="z-20 ml-12 md:ml-24 max-w-lg w-full px-4">
+        <div className="mb-10">
+          <p className="text-gray-500 font-medium mb-2 uppercase tracking-widest text-sm">
+            {isRegistering ? 'Step into better finance' : 'Welcome back, friend'}
+          </p>
+          <h2 className="text-4xl md:text-6xl font-bold text-secondary leading-[1.1]">
+            {isRegistering ? 'Create your' : 'Manage your'}<br />
+            <span className="text-primary underline decoration-secondary">Wealth Today</span>
+          </h2>
         </div>
 
-        <button 
-          onClick={handleSubmit}
-          disabled={loading}
-          className="bg-black md:bg-primary text-white px-8 py-3 rounded text-lg font-bold shadow-lg hover:opacity-90 transition-all active:scale-95 w-full md:w-auto flex items-center justify-center gap-2"
-        >
-          {loading && <i className="fa-solid fa-spinner fa-spin"></i>}
-          {isRegistering ? 'Sign Up' : 'Login'}
-        </button>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 border-l-4 border-red-500 text-sm font-bold flex items-center gap-2 rounded shadow-sm">
+              <i className="fa-solid fa-circle-exclamation"></i> {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="relative group">
+              <input
+                type="text"
+                className="w-full p-4 pl-12 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-primary focus:bg-white outline-none transition-all text-lg"
+                placeholder="Your unique handle"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+              <i className="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
+            </div>
+
+            <div className="relative group">
+              <input
+                type="password"
+                className="w-full p-4 pl-12 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-primary focus:bg-white outline-none transition-all text-lg"
+                placeholder="Secure password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
+            </div>
+          </div>
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full md:w-auto bg-secondary text-white px-10 py-4 rounded-xl text-lg font-bold shadow-2xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <i className="fa-solid fa-spinner fa-spin"></i>
+            ) : (
+              <>
+                {isRegistering ? 'Register Account' : 'Sign In'}
+                <i className="fa-solid fa-arrow-right-long"></i>
+              </>
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );
