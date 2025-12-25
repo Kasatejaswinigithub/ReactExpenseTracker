@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
@@ -10,7 +11,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
     const session = AuthService.getSession();
     if (session) {
       setCurrentUser(session);
@@ -19,10 +19,18 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
+    AuthService.logout();
     setCurrentUser(null);
   };
 
-  if (loading) return null; // Or a loading spinner
+  if (loading) return (
+    <div className="h-screen w-screen flex items-center justify-center bg-white">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-medium">Loading your finances...</p>
+      </div>
+    </div>
+  );
 
   return (
     <Router>
@@ -41,6 +49,7 @@ const App: React.FC = () => {
               <Navigate to="/" replace />
           } 
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
