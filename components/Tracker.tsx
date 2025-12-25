@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Transaction, TransactionType, User } from '../types';
+import { Transaction, TransactionType, User, CATEGORIES } from '../types';
 import { ExpenseService } from '../services/expenseService';
-import { AuthService } from '../services/authService';
-import { useNavigate } from 'react-router-dom';
+import { AIService } from '../services/aiService';
+import TransactionTable from './TransactionTable';
+import AIInsights from './AIInsights';
 
 interface TrackerProps {
   currentUser: User;
@@ -12,18 +14,18 @@ interface TrackerProps {
 const Tracker: React.FC<TrackerProps> = ({ currentUser, onLogout }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [analyzing, setAnalyzing] = useState(false);
   
   // Form State
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<TransactionType | ''>('');
+  const [type, setType] = useState<TransactionType>('Expense');
+  const [category, setCategory] = useState(CATEGORIES[1]); // Default to Food
 
   useEffect(() => {
-    if (currentUser) {
-      loadTransactions();
-    }
-  }, [currentUser]);
+    loadTransactions();
+  }, []);
 
   const loadTransactions = async () => {
     try {
@@ -37,22 +39,20 @@ const Tracker: React.FC<TrackerProps> = ({ currentUser, onLogout }) => {
     }
   };
 
-  const handleAdd = async () => {
-    if (!date || !amount || !type) return;
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || parseFloat(amount) <= 0) return;
     
     try {
       const newTx = await ExpenseService.add({
         date,
         amount: parseFloat(amount),
-        type: type as TransactionType,
+        type,
+        category,
         userId: currentUser.id
       });
-      setTransactions(prev => [...prev, newTx]);
-      // Reset form
+      setTransactions(prev => [newTx, ...prev]);
       setAmount('');
-      setType(''); 
-      // Keep date convenience or clear? Let's clear for fresh entry
-      setDate(''); 
     } catch (error) {
       console.error("Failed to add transaction", error);
     }
@@ -63,206 +63,236 @@ const Tracker: React.FC<TrackerProps> = ({ currentUser, onLogout }) => {
       await ExpenseService.delete(id);
       setTransactions(prev => prev.filter(t => t.id !== id));
     } catch (error) {
-      console.error("Failed to delete transaction", error);
+      console.error("Failed to delete", error);
     }
   };
 
-  const handleLogout = () => {
-    AuthService.logout();
-    onLogout();
-    navigate('/');
+  const runAIAdvisor = async () => {
+    setAnalyzing(true);
+    const analysis = await AIService.getFinancialAdvisor(transactions, currentUser.username);
+    setAiAnalysis(analysis);
+    setAnalyzing(false);
   };
 
-  // Calculations
-  const { totalIncome, totalExpense, totalBalance } = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+  const stats = useMemo(() => {
+    let income = 0, expense = 0, dailyExpense = 0, monthlyExpense = 0;
+    const today = new Date().toISOString().split('T')[0];
+    const thisMonth = today.slice(0, 7); // YYYY-MM
 
     transactions.forEach(t => {
-      if (t.type === 'Income') income += t.amount;
-      else expense += t.amount;
+      if (t.type === 'Income') {
+        income += t.amount;
+      } else {
+        expense += t.amount;
+        if (t.date === today) {
+          dailyExpense += t.amount;
+        }
+        if (t.date.startsWith(thisMonth)) {
+          monthlyExpense += t.amount;
+        }
+      }
     });
 
-    return {
-      totalIncome: income,
-      totalExpense: expense,
-      totalBalance: income - expense
+    return { 
+      income, 
+      expense, 
+      balance: income - expense,
+      dailyExpense,
+      monthlyExpense
     };
   }, [transactions]);
 
   return (
-    <div className="min-h-screen bg-white pb-10">
-      {/* Header */}
-      <div className="bg-black md:bg-primary text-white p-6 pl-8 flex justify-between items-center">
-        <div className="text-xl font-bold flex items-center gap-2">
-          <p className="m-0 leading-tight">
-            Expense<br />Tracker
-          </p>
-          <i className="fa-solid fa-sack-dollar text-2xl ml-2"></i>
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans text-secondary">
+      {/* Navbar */}
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-20 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
+              <i className="fa-solid fa-wallet text-2xl"></i>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 leading-none">SmartExpense</h1>
+              <p className="text-xs text-gray-500 mt-1 font-medium uppercase tracking-widest">Dashboard</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex flex-col items-end">
+              <span className="text-sm font-bold text-gray-900">{currentUser.username}</span>
+              <span className="text-xs text-green-500 font-bold">Premium User</span>
+            </div>
+            <button 
+              onClick={onLogout}
+              className="w-10 h-10 bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-500 rounded-full flex items-center justify-center transition-all group shadow-sm border border-gray-200"
+            >
+              <i className="fa-solid fa-power-off"></i>
+            </button>
+          </div>
         </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <div className="flex items-center gap-4">
-          <span className="hidden md:inline font-bold">Hi, {currentUser.username}</span>
-          <button 
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-md transition-colors flex items-center gap-2 text-sm"
-          >
-            <i className="fa-solid fa-right-from-bracket"></i> Logout
-          </button>
-        </div>
-      </div>
+        {/* Left Column: Form & Insights */}
+        <div className="lg:col-span-4 space-y-8">
+          
+          {/* Add Transaction Card */}
+          <div className="bg-white p-8 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <i className="fa-solid fa-plus-circle text-primary"></i>
+              New Entry
+            </h3>
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setType('Expense')}
+                  className={`py-3 rounded-xl font-bold transition-all ${type === 'Expense' ? 'bg-secondary text-white shadow-lg' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  Expense
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setType('Income')}
+                  className={`py-3 rounded-xl font-bold transition-all ${type === 'Income' ? 'bg-primary text-white shadow-lg' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  Income
+                </button>
+              </div>
 
-      {/* Input Form */}
-      <div className="
-        flex flex-col md:flex-row justify-around items-center 
-        w-[90%] md:w-[80%] mx-auto mt-6 p-4 md:py-6 
-        rounded-lg shadow-[0px_0px_10px_rgba(0,0,0,0.5)] md:shadow-[0px_0px_10px_#476EF7]
-        gap-4 md:gap-0 bg-white
-      ">
-        <div className="relative w-[80%] md:w-[30%]">
-          <input 
-            type="date" 
-            id="dateInput"
-            className="peer block w-full px-3 py-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary placeholder-transparent pt-6"
-            placeholder="Date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Date</label>
+                <input 
+                  type="date" 
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-primary focus:bg-white outline-none"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Amount ($)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-primary focus:bg-white outline-none font-bold text-lg"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Category</label>
+                <select 
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-primary focus:bg-white outline-none"
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                >
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4"
+              >
+                Save Transaction
+              </button>
+            </form>
+          </div>
+
+          {/* AI Advisor Card */}
+          <AIInsights 
+            analysis={aiAnalysis} 
+            loading={analyzing} 
+            onAnalyze={runAIAdvisor}
           />
-          <label 
-            htmlFor="dateInput"
-            className="absolute left-3 top-1 text-xs text-gray-500 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:top-1 peer-focus:text-xs"
-          >
-            Date
-          </label>
         </div>
 
-        <div className="relative w-[80%] md:w-[30%]">
-          <input 
-            type="number" 
-            id="amountInput"
-            className="peer block w-full px-3 py-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary placeholder-transparent pt-6"
-            placeholder="Amount"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-          />
-          <label 
-            htmlFor="amountInput"
-            className="absolute left-3 top-1 text-xs text-gray-500 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:top-1 peer-focus:text-xs"
-          >
-            Amount
-          </label>
+        {/* Right Column: Balance & Table */}
+        <div className="lg:col-span-8 space-y-8">
+          
+          {/* Main Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+              <p className="text-gray-400 text-sm font-bold uppercase mb-2">Net Balance</p>
+              <h2 className={`text-3xl font-bold ${stats.balance >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+                ${stats.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </h2>
+              <div className="mt-4 flex items-center gap-2 text-xs font-bold text-gray-400">
+                <i className="fa-solid fa-chart-line"></i> Lifetime total
+              </div>
+            </div>
+
+            <div className="bg-primary/5 p-6 rounded-3xl shadow-lg border border-primary/10">
+              <p className="text-primary text-sm font-bold uppercase mb-2">Total Income</p>
+              <h2 className="text-3xl font-bold text-primary">
+                +${stats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </h2>
+              <div className="mt-4 flex items-center gap-2 text-xs font-bold text-primary">
+                <i className="fa-solid fa-arrow-up"></i> All time received
+              </div>
+            </div>
+
+            <div className="bg-secondary p-6 rounded-3xl shadow-lg border border-secondary text-white">
+              <p className="text-gray-400 text-sm font-bold uppercase mb-2">Total Expenses</p>
+              <h2 className="text-3xl font-bold text-white">
+                -${stats.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </h2>
+              <div className="mt-4 flex items-center gap-2 text-xs font-bold text-gray-400">
+                <i className="fa-solid fa-arrow-down"></i> All time spent
+              </div>
+            </div>
+          </div>
+
+          {/* Periodic Expenditure Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-3xl shadow-md border-l-4 border-l-orange-400 flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Daily Burn Rate</p>
+                <h3 className="text-2xl font-bold text-secondary">
+                  ${stats.dailyExpense.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-1 italic">Calculated for today</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-500">
+                <i className="fa-solid fa-calendar-day text-xl"></i>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl shadow-md border-l-4 border-l-indigo-400 flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-xs font-bold uppercase mb-1">Monthly Expenditure</p>
+                <h3 className="text-2xl font-bold text-secondary">
+                  ${stats.monthlyExpense.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-1 italic">For current month</p>
+              </div>
+              <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500">
+                <i className="fa-solid fa-calendar-check text-xl"></i>
+              </div>
+            </div>
+          </div>
+
+          {/* Transaction History */}
+          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
+            <div className="p-8 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-900">Activity Log</h3>
+              <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-xs font-bold">
+                {transactions.length} items
+              </span>
+            </div>
+            
+            <TransactionTable 
+              transactions={transactions} 
+              loading={loading} 
+              onDelete={handleDelete} 
+            />
+          </div>
         </div>
-
-        <div className="relative w-[75%] md:w-[30%]">
-          <select 
-            className="block w-full px-3 py-3 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-            value={type}
-            onChange={e => setType(e.target.value as TransactionType)}
-          >
-            <option value="" disabled>Select Type</option>
-            <option value="Income">Income</option>
-            <option value="Expense">Expense</option>
-          </select>
-        </div>
-
-        <button 
-          onClick={handleAdd}
-          className="
-            w-[75%] md:w-[50px] h-[45px] md:h-[50px] 
-            bg-black md:bg-primary text-white 
-            rounded-lg md:rounded-full 
-            text-2xl font-bold flex justify-center items-center 
-            hover:opacity-90 transition-all shadow-md
-          "
-        >
-          +
-        </button>
-      </div>
-
-      {/* Cards */}
-      <div className="flex flex-wrap md:flex-nowrap w-[90%] md:w-[80%] mx-auto justify-between gap-5 mt-8">
-        {/* Income Card */}
-        <div className="bg-black md:bg-primary text-white rounded-lg p-5 w-[45%] md:w-[30%] h-[150px] flex flex-col justify-center shadow-md">
-          <h5 className="text-sm md:text-lg mb-2 flex items-center gap-2">
-            Total Income <i className="fa-solid fa-money-bill-1-wave"></i>
-          </h5>
-          <h1 className="text-2xl md:text-4xl font-bold flex items-center gap-1">
-            <i className="fa-solid fa-indian-rupee-sign text-xl md:text-3xl"></i>
-            <span>{totalIncome}</span>
-          </h1>
-        </div>
-
-        {/* Expense Card */}
-        <div className="bg-black md:bg-primary text-white rounded-lg p-5 w-[45%] md:w-[30%] h-[150px] flex flex-col justify-center shadow-md">
-          <h5 className="text-sm md:text-lg mb-2 flex items-center gap-2">
-            Total Expenses <i className="fa-solid fa-money-bill-1-wave"></i>
-          </h5>
-          <h1 className="text-2xl md:text-4xl font-bold flex items-center gap-1">
-            <i className="fa-solid fa-indian-rupee-sign text-xl md:text-3xl"></i>
-            <span>{totalExpense}</span>
-          </h1>
-        </div>
-
-        {/* Balance Card */}
-        <div className="bg-black md:bg-primary text-white rounded-lg p-5 w-full md:w-[30%] h-[150px] flex flex-col justify-center shadow-md">
-          <h5 className="text-sm md:text-lg mb-2 flex items-center gap-2">
-            Total Balance <i className="fa-solid fa-money-bill-1-wave"></i>
-          </h5>
-          <h1 className="text-2xl md:text-4xl font-bold flex items-center gap-1">
-            <i className="fa-solid fa-indian-rupee-sign text-xl md:text-3xl"></i>
-            <span>{totalBalance}</span>
-          </h1>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="w-[90%] md:w-[80%] mx-auto mt-8 border border-black rounded-lg shadow-[0px_0px_4px_rgba(0,0,0,0.5)] overflow-hidden">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-black md:bg-primary text-white text-left">
-              <th className="p-4 pl-8 md:pl-12 font-normal">Amount</th>
-              <th className="p-4 font-normal hidden md:table-cell">Transaction Type</th>
-              <th className="p-4 font-normal md:hidden">Type</th> 
-              <th className="p-4 font-normal">Transaction Date</th>
-              <th className="p-4 font-normal text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="text-center p-8 text-gray-500">Loading transactions...</td>
-              </tr>
-            ) : transactions.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center p-8 text-gray-500">No transactions found for this user.</td>
-              </tr>
-            ) : (
-              transactions.map((t) => (
-                <tr key={t.id} className="border-t border-gray-200 hover:bg-gray-50 transition-colors">
-                  <td className="p-4 pl-8 md:pl-12 font-bold">{t.amount}</td>
-                  <td className="p-4 hidden md:table-cell">
-                    <span className={`px-2 py-1 rounded text-xs text-white ${t.type === 'Income' ? 'bg-green-500' : 'bg-red-500'}`}>
-                      {t.type}
-                    </span>
-                  </td>
-                  <td className="p-4 md:hidden">
-                     <span className={`w-3 h-3 inline-block rounded-full ${t.type === 'Income' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  </td>
-                  <td className="p-4 text-gray-600">{t.date}</td>
-                  <td className="p-4 text-center">
-                    <button 
-                      onClick={() => handleDelete(t.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white w-10 h-10 rounded-full flex items-center justify-center mx-auto transition-colors border border-black shadow-sm"
-                    >
-                      <i className="fa-solid fa-trash text-sm"></i>
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      </main>
     </div>
   );
 };
