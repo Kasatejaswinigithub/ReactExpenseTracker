@@ -1,132 +1,136 @@
 
 import React, { useState } from 'react';
-import { AuthService } from '../services/authService';
-import { User } from '../types';
+import { ApiService } from '../services/api.ts';
+import { User } from '../types.ts';
 
 interface LoginProps {
   setUser: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ setUser }) => {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [error, setError] = useState('');
+  const [password, setPassword] = useState(''); 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      setError('Both fields are required');
+    if (!username.trim()) {
+      setError("Identity handle is required.");
       return;
     }
 
-    setError('');
     setLoading(true);
-
+    setError(null);
     try {
       let user: User;
-      if (isRegistering) {
-        user = await AuthService.register(username, password);
+      if (mode === 'register') {
+        user = await ApiService.register(username);
       } else {
-        user = await AuthService.login(username, password);
+        user = await ApiService.login(username);
       }
-      
-      AuthService.saveSession(user);
       setUser(user);
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(err.message || "Cluster authentication failed.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden border-[12px] border-secondary flex items-center bg-white">
-      {/* Dynamic Background Element */}
-      <div 
-        className={`
-          absolute rounded-full z-10 transition-all duration-700 ease-in-out
-          w-[350px] h-[350px] -right-[150px] -top-[150px] bg-secondary
-          md:w-[850px] md:h-[850px] md:-right-[350px] md:-top-[100px] md:bg-primary
-        `}
-      ></div>
+    <div className="min-h-screen w-full flex bg-secondary overflow-hidden relative font-sans text-white">
+      {/* Dynamic Glow FX */}
+      <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-primary/10 rounded-full blur-[120px] animate-pulse"></div>
+      <div className="absolute bottom-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[150px]"></div>
 
-      <div className="absolute top-0 left-0 w-full z-20 flex justify-between items-center p-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-secondary md:bg-white text-white md:text-primary rounded-xl flex items-center justify-center shadow-lg">
-            <i className="fa-solid fa-sack-dollar text-xl"></i>
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-secondary">SmartExpense</h1>
-        </div>
-        <button 
-          onClick={() => {
-            setIsRegistering(!isRegistering);
-            setError('');
-          }}
-          className="bg-white text-secondary font-bold shadow-[4px_4px_0px_#111827] px-6 py-2 rounded-lg border-2 border-secondary hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#111827] transition-all active:scale-95 z-30"
-        >
-          {isRegistering ? 'Login' : 'Join'}
-        </button>
-      </div>
-
-      <div className="z-20 ml-12 md:ml-24 max-w-lg w-full px-4">
-        <div className="mb-10">
-          <p className="text-gray-500 font-medium mb-2 uppercase tracking-widest text-sm">
-            {isRegistering ? 'Step into better finance' : 'Welcome back, friend'}
-          </p>
-          <h2 className="text-4xl md:text-6xl font-bold text-secondary leading-[1.1]">
-            {isRegistering ? 'Create your' : 'Manage your'}<br />
-            <span className="text-primary underline decoration-secondary">Wealth Today</span>
-          </h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {error && (
-            <div className="p-3 bg-red-50 text-red-600 border-l-4 border-red-500 text-sm font-bold flex items-center gap-2 rounded shadow-sm">
-              <i className="fa-solid fa-circle-exclamation"></i> {error}
+      <div className="m-auto w-full max-w-lg p-6 relative z-10">
+        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-10 rounded-[3rem] shadow-2xl">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/20 rounded-3xl mb-6 border border-primary/30 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+              <i className="fa-solid fa-vault text-4xl text-primary"></i>
             </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="relative group">
-              <input
-                type="text"
-                className="w-full p-4 pl-12 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-primary focus:bg-white outline-none transition-all text-lg"
-                placeholder="Your unique handle"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <i className="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
-            </div>
-
-            <div className="relative group">
-              <input
-                type="password"
-                className="w-full p-4 pl-12 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-primary focus:bg-white outline-none transition-all text-lg"
-                placeholder="Secure password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors"></i>
-            </div>
+            <h1 className="text-4xl font-black tracking-tighter uppercase">
+              EXPRO <span className="text-primary">{mode === 'register' ? 'JOIN' : 'ACCESS'}</span>
+            </h1>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mt-2">
+              {mode === 'register' ? 'Initialize Private Wealth Node' : 'Encrypted Session Login'}
+            </p>
           </div>
 
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full md:w-auto bg-secondary text-white px-10 py-4 rounded-xl text-lg font-bold shadow-2xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-3"
-          >
-            {loading ? (
-              <i className="fa-solid fa-spinner fa-spin"></i>
-            ) : (
-              <>
-                {isRegistering ? 'Register Account' : 'Sign In'}
-                <i className="fa-solid fa-arrow-right-long"></i>
-              </>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 p-4 rounded-2xl text-[10px] font-black text-center uppercase tracking-widest animate-bounce">
+                <i className="fa-solid fa-shield-halved mr-2"></i> {error}
+              </div>
             )}
-          </button>
-        </form>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Identity Handle</label>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    className="w-full p-5 pl-14 bg-white/5 border border-white/10 rounded-2xl focus:border-primary focus:bg-white/10 outline-none transition-all text-white text-lg placeholder:text-gray-700"
+                    placeholder="User Alias"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  <i className="fa-solid fa-fingerprint absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-primary transition-colors text-xl"></i>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-2">Secure Keyphrase</label>
+                <div className="relative group">
+                  <input
+                    type="password"
+                    className="w-full p-5 pl-14 bg-white/5 border border-white/10 rounded-2xl focus:border-primary focus:bg-white/10 outline-none transition-all text-white text-lg placeholder:text-gray-700"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <i className="fa-solid fa-key absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-primary transition-colors text-xl"></i>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              type="submit"
+              disabled={loading || !username}
+              className="w-full bg-primary text-secondary font-black py-5 rounded-2xl text-sm shadow-[0_20px_40px_rgba(16,185,129,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest"
+            >
+              {loading ? (
+                <i className="fa-solid fa-circle-notch fa-spin"></i>
+              ) : (
+                <>
+                  {mode === 'register' ? 'Create Account' : 'Sign In'}
+                  <i className="fa-solid fa-arrow-right-long text-xs"></i>
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-10 pt-8 border-t border-white/5 flex flex-col items-center gap-4">
+            <button 
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setError(null);
+                setUsername('');
+              }}
+              className="text-gray-500 hover:text-white text-[10px] font-black uppercase tracking-[0.3em] transition-colors"
+            >
+              {mode === 'login' ? "New to the cluster? Join Now" : "Returning? Access Vault"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-12 text-center opacity-20 flex justify-center gap-8 text-2xl grayscale hover:grayscale-0 transition-all duration-500">
+           <i className="fa-brands fa-cc-visa"></i>
+           <i className="fa-brands fa-cc-mastercard"></i>
+           <i className="fa-brands fa-cc-apple-pay"></i>
+           <i className="fa-brands fa-cc-stripe"></i>
+        </div>
       </div>
     </div>
   );
