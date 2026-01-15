@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './components/Login';
-import Tracker from './components/Tracker';
-import { User } from './types';
-import { AuthService } from './services/authService';
+import Login from './components/Login.tsx';
+import Tracker from './components/Tracker.tsx';
+import { User } from './types.ts';
+import { ApiService } from './services/api.ts';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const session = AuthService.getSession();
+    const session = ApiService.getSession();
     if (session) {
       setCurrentUser(session);
     }
@@ -19,7 +19,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    AuthService.logout();
+    ApiService.logout();
     setCurrentUser(null);
   };
 
@@ -27,7 +27,7 @@ const App: React.FC = () => {
     <div className="h-screen w-screen flex items-center justify-center bg-white">
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-500 font-medium">Loading your finances...</p>
+        <p className="text-gray-500 font-medium tracking-widest animate-pulse">SECURING ASSETS...</p>
       </div>
     </div>
   );
@@ -56,3 +56,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
